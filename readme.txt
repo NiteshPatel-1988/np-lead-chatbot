@@ -36,7 +36,7 @@ No third-party services. No monthly SaaS fees. No data leaves your server.
 * **Search & sort** - find leads by name, email, phone, or message; sort by name or date
 * **Client-side validation** - instant feedback before form submission
 * **CSV Export** - download all leads as a CSV file directly from the admin dashboard
-* **REST API powered** - built on the WordPress REST API with nonce verification
+* **REST API powered** - built on the WordPress REST API with schema validation, and works with page caching plugins
 * **GDPR-friendly** - all data stored locally in your own database; no external services
 
 ---

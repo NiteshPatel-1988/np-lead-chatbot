@@ -2,7 +2,7 @@
 
 ![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
-![Version](https://img.shields.io/badge/Version-2.4.3-orange)
+![Version](https://img.shields.io/badge/Version-2.4.4-orange)
 ![License](https://img.shields.io/badge/License-GPLv2-green)
 
 A modern floating lead capture chat widget for WordPress. Collect visitor leads directly on your site and manage everything inside your WordPress dashboard - no SaaS, no monthly dependency, no data leaving your server.
@@ -22,7 +22,7 @@ A modern floating lead capture chat widget for WordPress. Collect visitor leads 
 
 ## Compatibility
 
-- Tested with WordPress 7.0
+- Tested with WordPress 7.1
 - Compatible with WooCommerce
 - Compatible with Elementor
 
@@ -38,25 +38,28 @@ A modern floating lead capture chat widget for WordPress. Collect visitor leads 
 - Configurable spam cooldown and duplicate submission protection
 - CSV export
 - Client-side validation
-- REST API powered with nonce verification
-- GDPR-friendly local storage
+- REST API powered, works with page caching plugins
+- GDPR-friendly local storage with suggested privacy policy text
 - Locally bundled fonts (no Google Fonts request)
+- Assets load only where the widget or shortcode is used
+- Keyboard and screen reader friendly floating button
 - Works with Elementor, Divi, Gutenberg, and WooCommerce
 
 ---
 
-## � Security Features (v2.4.0+)
+## 🔒 Security Features
 
-### Enhanced Input Validation
+### Input Validation
 - ✅ Phone number format validation (digits, spaces, hyphens, +, parentheses, periods)
 - ✅ Email format verification
 - ✅ Textarea field sanitization
-- ✅ URL validation and escaping
+- ✅ Field length limits enforced by the REST route schema (name 191, phone 50, message 5,000 characters)
+- ✅ Source page URL must belong to your own site
 
-### Improved REST API Security
-- ✅ Better nonce header handling (supports multiple header formats)
+### REST API Security
+- ✅ Public lead endpoint with a typed argument schema (non-string values are rejected)
+- ✅ WordPress core verifies the REST nonce for logged-in users; visitors send none, so cached pages never break the form
 - ✅ Proper error responses with HTTP status codes
-- ✅ Enhanced permission checks with clear error messages
 
 ### Email Security
 - ✅ All email content properly sanitized
@@ -73,18 +76,20 @@ A modern floating lead capture chat widget for WordPress. Collect visitor leads 
 - ✅ Full privacy data export support (WordPress Tools > Privacy)
 - ✅ Complete data erasure support (right to be forgotten)
 - ✅ Integrated with WordPress privacy requests
+- ✅ Suggested privacy policy text (Settings > Privacy > Policy Guide)
 - ✅ GDPR-compliant lead management
 
 ### Additional Security
-- ✅ Rate limiting & spam protection
+- ✅ Rate limiting per visitor IP and per email address
 - ✅ Honeypot field for bot detection
 - ✅ Duplicate submission prevention
 - ✅ SQL injection prevention with prepared statements
-- ✅ XSS prevention with proper escaping
+- ✅ XSS prevention with output escaped at the point of printing
+- ✅ Passes the WordPress.org Plugin Check tool
 
 ---
 
-## �🚀 PRO Features
+## 🚀 PRO Features
 
 ### Lead Capture
 - Unlimited leads - no cap
@@ -222,6 +227,18 @@ Embeds the lead form inline anywhere - pages, posts, or widget areas.
 
 ## Changelog
 
+### 2.4.4
+- **Tested** with WordPress 7.1
+- **Security** lead form fields now have length limits, and the source page URL must belong to your own site
+- **Security** rate limiting now applies per visitor IP and per email separately, so changing one of them no longer bypasses the cooldown
+- **Fixed** lead form no longer fails with a nonce error on cached pages
+- **Fixed** frontend CSS/JS only load when the floating widget or shortcode is used
+- **Fixed** floating chat button now opens with Enter/Space keys and announces its open state to screen readers
+- **Improved** leads list uses database pagination, so large lead lists load faster
+- **Improved** privacy policy suggestion text added under Settings > Privacy
+- **Improved** uninstall now also cleans up on multisite and removes the dismissed-notice option
+- **Removed** unused rate limit clearing function
+
 ### 2.4.3
 
 - **Added** full GDPR compliance support - captured leads are now included in WordPress's built-in Tools → Export Personal Data and Erase Personal Data requests.
@@ -302,7 +319,15 @@ All lead data is stored inside your own WordPress database. The plugin makes no 
 
 ## Contributing
 
-Issues and pull requests are welcome via the [GitHub repository](https://github.com/NiteshPatel-1988).
+Issues and pull requests are welcome via the [GitHub repository](https://github.com/NiteshPatel-1988/np-lead-chatbot).
+
+### Building a release zip
+
+Development-only files (`.gitattributes`, `README.md`) are marked `export-ignore`, so build the WordPress.org package from a committed state with:
+
+```bash
+git archive -o ../np-lead-chatbot.zip --prefix=np-lead-chatbot/ HEAD
+```
 
 ---
 
