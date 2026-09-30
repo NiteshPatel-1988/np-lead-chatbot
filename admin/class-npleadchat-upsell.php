@@ -81,9 +81,6 @@ class NPLEADCHAT_Upsell {
 			wp_die( esc_html__( 'Insufficient permissions.', 'np-lead-chatbot' ) );
 		}
 
-		$upgrade_url = esc_url( self::UPGRADE_URL );
-		$preview_url = esc_url( self::PREVIEW_URL );
-
 		?>
 		<div class="wrap npleadchat-upsell-wrap">
 
@@ -233,9 +230,9 @@ class NPLEADCHAT_Upsell {
 						foreach ( $rows as $row ) {
 							printf(
 								'<tr><td>%s</td><td>%s</td><td>%s</td></tr>',
-								$row[0], // Already escaped above.
-								$row[1],
-								$row[2]
+								wp_kses_post( $row[0] ),
+								wp_kses_post( $row[1] ),
+								wp_kses_post( $row[2] )
 							);
 						}
 						?>
@@ -244,14 +241,14 @@ class NPLEADCHAT_Upsell {
 
 				<!-- ── CTAs ──────────────────────────────────────────────── -->
 				<p class="npleadchat-upsell-actions">
-					<a href="<?php echo $upgrade_url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped via esc_url() above ?>"
+					<a href="<?php echo esc_url( self::UPGRADE_URL ); ?>"
 					   class="button button-primary button-hero"
 					   target="_blank"
 					   rel="noopener noreferrer">
 						<?php esc_html_e( '🚀 Upgrade to PRO', 'np-lead-chatbot' ); ?>
 					</a>
 
-					<a href="<?php echo $preview_url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped via esc_url() above ?>"
+					<a href="<?php echo esc_url( self::PREVIEW_URL ); ?>"
 					   class="button button-secondary button-hero"
 					   target="_blank"
 					   rel="noopener noreferrer">
@@ -315,31 +312,40 @@ class NPLEADCHAT_Upsell {
 			return;
 		}
 
-		$upgrade_url = esc_url( self::UPGRADE_URL );
-		$dismiss_url = esc_url(
-			wp_nonce_url(
-				add_query_arg( 'npleadchat_dismiss_notice', '1' ),
-				'npleadchat_dismiss_notice_nonce'
-			)
+		$dismiss_url = wp_nonce_url(
+			add_query_arg( 'npleadchat_dismiss_notice', '1' ),
+			'npleadchat_dismiss_notice_nonce'
+		);
+
+		$upgrade_link = sprintf(
+			'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+			esc_url( self::UPGRADE_URL ),
+			esc_html__( 'Upgrade Now →', 'np-lead-chatbot' )
 		);
 
 		?>
 		<div class="notice notice-info" id="npleadchat-upsell-notice">
 			<p>
 				<?php
-				printf(
-					/* translators: 1: opening <strong> tag, 2: closing </strong> tag, 3: upgrade link HTML */
-					esc_html__( '%1$sLead Capture Chat PRO%2$s - unlock custom fields, advanced email notifications, Google reCAPTCHA v3, unlimited leads, analytics, and more. %3$s', 'np-lead-chatbot' ),
-					'<strong>',
-					'</strong>',
+				echo wp_kses(
 					sprintf(
-						'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
-						$upgrade_url,
-						esc_html__( 'Upgrade Now →', 'np-lead-chatbot' )
+						/* translators: 1: opening <strong> tag, 2: closing </strong> tag, 3: upgrade link HTML */
+						esc_html__( '%1$sLead Capture Chat PRO%2$s - unlock custom fields, advanced email notifications, Google reCAPTCHA v3, unlimited leads, analytics, and more. %3$s', 'np-lead-chatbot' ),
+						'<strong>',
+						'</strong>',
+						$upgrade_link
+					),
+					array(
+						'strong' => array(),
+						'a'      => array(
+							'href'   => array(),
+							'target' => array(),
+							'rel'    => array(),
+						),
 					)
 				);
 				?>
-				&nbsp;&nbsp;<a href="<?php echo $dismiss_url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_url() applied above ?>" style="color:#999; text-decoration:none; font-size:.85em;">
+				&nbsp;&nbsp;<a href="<?php echo esc_url( $dismiss_url ); ?>" style="color:#999; text-decoration:none; font-size:.85em;">
 					<?php esc_html_e( 'Dismiss', 'np-lead-chatbot' ); ?>
 				</a>
 			</p>

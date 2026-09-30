@@ -16,14 +16,20 @@ class NPLEADCHAT_Frontend {
         add_action( 'wp_footer', array( __CLASS__, 'npleadfloating_widget' ) );
     }
 
+    /**
+     * Register assets on every page, but only enqueue them when the floating
+     * widget is enabled. The shortcode enqueues them itself when it is used.
+     */
     public static function npleadchat_enqueue() {
-        wp_enqueue_style(
+        $options = NPLEADCHAT_Admin::npleadchat_get_options();
+
+        wp_register_style(
             'npleadchat-frontend',
             NPLEADCHAT_URL . 'assets/css/chatbot.css',
             array(),
             NPLEADCHAT_VERSION
         );
-        wp_enqueue_script(
+        wp_register_script(
             'npleadchat-frontend-js',
             NPLEADCHAT_URL . 'assets/js/chatbot.js',
             array( 'jquery' ),
@@ -32,8 +38,10 @@ class NPLEADCHAT_Frontend {
         );
         wp_localize_script( 'npleadchat-frontend-js', 'npleadchat_api', array(
             'url'            => esc_url_raw( rest_url( 'npleadchat/v1/lead' ) ),
-            'nonce'          => wp_create_nonce( 'wp_rest' ),
-            'successMessage' => NPLEADCHAT_Admin::npleadchat_get_options()['success_message'],
+            // Only logged-in users need the REST nonce. A visitor's nonce gets cached
+            // with the page, and once it expires WordPress rejects every submission.
+            'nonce'          => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
+            'successMessage' => $options['success_message'],
             'i18n'           => array(
                 'nameRequired'    => __( 'Please enter your name.', 'np-lead-chatbot' ),
                 'emailRequired'   => __( 'Please enter your email address.', 'np-lead-chatbot' ),
@@ -44,6 +52,18 @@ class NPLEADCHAT_Frontend {
                 'fallbackError'   => __( 'Something went wrong. Please try again.', 'np-lead-chatbot' ),
             ),
         ) );
+
+        if ( ! empty( $options['enable_floating_widget'] ) ) {
+            self::npleadchat_enqueue_assets();
+        }
+    }
+
+    /**
+     * Enqueue the registered frontend assets.
+     */
+    private static function npleadchat_enqueue_assets() {
+        wp_enqueue_style( 'npleadchat-frontend' );
+        wp_enqueue_script( 'npleadchat-frontend-js' );
     }
 
     /**
@@ -51,6 +71,8 @@ class NPLEADCHAT_Frontend {
      */
     public static function npleadchat_bot_ui() {
         $options = NPLEADCHAT_Admin::npleadchat_get_options();
+
+        self::npleadchat_enqueue_assets();
 
         ob_start(); ?>
 
@@ -62,7 +84,7 @@ class NPLEADCHAT_Frontend {
             </div>
 
             <div class="nlc-form-body">
-                <?php echo self::npleadchat_form_fields(); ?>
+                <?php echo self::npleadchat_form_fields(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- every dynamic value is escaped inside npleadchat_form_fields(). ?>
             </div>
 
         </div>
@@ -81,7 +103,7 @@ class NPLEADCHAT_Frontend {
         }
 
         /* Floating trigger button */
-        echo '<div id="wlc-floating-btn" role="button" aria-label="' . esc_attr__( 'Open chat', 'np-lead-chatbot' ) . '" tabindex="0">';
+        echo '<div id="wlc-floating-btn" role="button" aria-label="' . esc_attr__( 'Open chat', 'np-lead-chatbot' ) . '" aria-controls="wlc-chat-popup" aria-expanded="false" tabindex="0">';
 
         /* Chat icon */
         echo '<svg class="nlc-icon nlc-icon-chat" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
@@ -119,14 +141,14 @@ class NPLEADCHAT_Frontend {
                     echo '</div>';
 
                     /* Close button */
-                    echo '<button id="wlc-chat-close" aria-label="' . esc_attr__( 'Close chat', 'np-lead-chatbot' ) . '">&times;</button>';
+                    echo '<button type="button" id="wlc-chat-close" aria-label="' . esc_attr__( 'Close chat', 'np-lead-chatbot' ) . '">&times;</button>';
 
                 echo '</div>';
             echo '</div>';
 
             /* Form */
             echo '<div class="nlc-chatbot">';
-            echo self::npleadchat_form_fields();
+            echo self::npleadchat_form_fields(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- every dynamic value is escaped inside npleadchat_form_fields().
             echo '</div>';
 
             /* Footer */

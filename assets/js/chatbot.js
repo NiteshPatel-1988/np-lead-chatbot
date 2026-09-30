@@ -103,11 +103,13 @@ jQuery(document).ready(function ($) {
             data:        JSON.stringify(data),
             contentType: 'application/json',
             beforeSend:  function (xhr) {
-                xhr.setRequestHeader('X-WP-Nonce', api.nonce);
+                if (api.nonce) {
+                    xhr.setRequestHeader('X-WP-Nonce', api.nonce);
+                }
             },
             success: function (res) {
                 var isSuccess = !res || res.success !== false;
-                showResponse($form, res.message || api.successMessage || strings.fallbackSuccess, isSuccess ? 'success' : 'error');
+                showResponse($form, (res && res.message) || api.successMessage || strings.fallbackSuccess, isSuccess ? 'success' : 'error');
 
                 if (isSuccess) {
                     getField($form, 'name').val('');
@@ -150,20 +152,28 @@ jQuery(document).ready(function ($) {
         }
     });
 
+    /* The trigger is a div with role="button", so give it button keyboard behaviour */
+    $trigBtn.on('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            $trigBtn.trigger('click');
+        }
+    });
+
     $('#wlc-chat-close').on('click', function () {
         closePopup();
     });
 
     function openPopup() {
         $popup.removeClass('nlc-closing').show().addClass('nlc-open');
-        $trigBtn.addClass('is-open');
+        $trigBtn.addClass('is-open').attr('aria-expanded', 'true');
         // Focus first input for accessibility
         setTimeout(function () { $popup.find('[data-nlc-field="name"]').trigger('focus'); }, 320);
     }
 
     function closePopup() {
         $popup.removeClass('nlc-open').addClass('nlc-closing');
-        $trigBtn.removeClass('is-open');
+        $trigBtn.removeClass('is-open').attr('aria-expanded', 'false');
         setTimeout(function () { $popup.hide().removeClass('nlc-closing'); }, 200);
     }
 

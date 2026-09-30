@@ -2,9 +2,9 @@
 Contributors:      nitspatel
 Tags:              lead generation, chat widget, contact form, leads, lead tracking
 Requires at least: 6.0
-Tested up to:      7.0
+Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        2.4.3
+Stable tag:        2.4.4
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -225,6 +225,17 @@ WP LeadChat Pro is the premium version that unlocks unlimited leads, custom fiel
 
 == Changelog ==
 
+= 2.4.4 =
+* Tested with WordPress 7.1
+* Security: lead form fields now have length limits, and the source page URL must belong to your own site
+* Security: rate limiting now applies per visitor IP and per email separately, so changing one of them no longer bypasses the cooldown
+* Fixed: lead form no longer fails with a nonce error on cached pages
+* Fixed: frontend CSS/JS only load when the floating widget or shortcode is used
+* Fixed: floating chat button now opens with Enter/Space keys and announces its open state to screen readers
+* Improved: leads list uses database pagination, so large lead lists load faster
+* Improved: privacy policy suggestion text added under Settings > Privacy
+* Improved: uninstall now also cleans up on multisite and removes the dismissed-notice option
+
 = 2.4.3 =
 * Fixed: Admin stylesheet now loads correctly on the Settings page
 * Fixed: "Upgrade to PRO" admin notice no longer shows redundantly on the Upgrade to PRO page itself
@@ -328,6 +339,9 @@ WP LeadChat Pro is the premium version that unlocks unlimited leads, custom fiel
 ---
 
 == Upgrade Notice ==
+
+= 2.4.4 =
+Security hardening, WordPress 7.1 compatibility and a fix for forms on cached pages. Safe to upgrade.
 
 = 2.4.3 =
 fixes two admin-page bugs (Settings stylesheet not loading, and a redundant upgrade notice).

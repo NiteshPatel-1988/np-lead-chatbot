@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class NPLEADCHAT_API {
     const MIN_SUBMIT_SECONDS = 3;
     const DUPLICATE_WINDOW   = 10 * MINUTE_IN_SECONDS;
+    const MAX_MESSAGE_LENGTH = 5000;
 
     public static function npleadchat_init() {
         add_action( 'rest_api_init', array( __CLASS__, 'npleadchat_register_routes' ) );
@@ -19,39 +20,26 @@ class NPLEADCHAT_API {
 
     public static function npleadchat_register_routes() {
         register_rest_route( 'npleadchat/v1', '/lead', array(
-            'methods'  => 'POST',
-            'callback' => array( __CLASS__, 'npleadchat_handle_lead' ),
-            'permission_callback' => array( __CLASS__, 'npleadchat_permission_check' ),
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => array( __CLASS__, 'npleadchat_handle_lead' ),
+            /*
+             * Public lead form: any visitor may submit, so no capability is required.
+             * For logged-in users WordPress core still verifies the X-WP-Nonce header
+             * (rest_cookie_check_errors). For visitors a nonce adds no protection, and
+             * requiring one breaks the form on cached pages once the nonce expires.
+             * Abuse is limited by the honeypot, timing check, rate limits and field limits.
+             */
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'name'            => array( 'type' => 'string', 'maxLength' => 191 ),
+                'email'           => array( 'type' => 'string', 'maxLength' => 191 ),
+                'phone'           => array( 'type' => 'string', 'maxLength' => 50 ),
+                'message'         => array( 'type' => 'string', 'maxLength' => self::MAX_MESSAGE_LENGTH ),
+                'source_url'      => array( 'type' => 'string', 'maxLength' => 2048 ),
+                'website'         => array( 'type' => 'string', 'maxLength' => 255 ),
+                'form_started_at' => array( 'type' => 'integer', 'minimum' => 0 ),
+            ),
         ) );
-    }
-
-    /**
-     * IMPROVEMENT: Better nonce header handling with fallback
-     * Handles both lowercase and uppercase header names for maximum compatibility
-     */
-    public static function npleadchat_permission_check( $request ) {
-        // Try both common header name formats
-        $nonce = $request->get_header( 'x-wp-nonce' ) ?: $request->get_header( 'X-WP-Nonce' );
-        
-        if ( empty( $nonce ) ) {
-            return new WP_Error(
-                'rest_nonce_missing',
-                __( 'Nonce missing in request.', 'np-lead-chatbot' ),
-                array( 'status' => 403 )
-            );
-        }
-
-        $nonce = sanitize_text_field( wp_unslash( $nonce ) );
-        
-        if ( ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-            return new WP_Error(
-                'rest_nonce_invalid',
-                __( 'Nonce verification failed.', 'np-lead-chatbot' ),
-                array( 'status' => 403 )
-            );
-        }
-
-        return true;
     }
 
     private static function npleadchat_success_message() {
@@ -61,11 +49,33 @@ class NPLEADCHAT_API {
     }
 
     private static function npleadchat_get_visitor_ip() {
-        if ( empty( $_SERVER['REMOTE_ADDR'] ) ) {
-            return 'unknown';
+        $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+
+        return rest_is_ip_address( $ip ) ? $ip : 'unknown';
+    }
+
+    /**
+     * Only keep source URLs that point at this site, so stored links cannot be
+     * used to plant arbitrary external URLs in the admin leads table.
+     *
+     * @param string $url Submitted page URL.
+     * @return string
+     */
+    private static function npleadchat_sanitize_source_url( $url ) {
+        $url = esc_url_raw( $url, array( 'http', 'https' ) );
+
+        if ( '' === $url ) {
+            return '';
         }
 
-        return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+        $url_host  = wp_parse_url( $url, PHP_URL_HOST );
+        $site_host = wp_parse_url( home_url(), PHP_URL_HOST );
+
+        if ( ! $url_host || strtolower( $url_host ) !== strtolower( (string) $site_host ) ) {
+            return '';
+        }
+
+        return $url;
     }
 
     private static function npleadchat_is_too_fast( $form_started_at ) {
@@ -78,8 +88,18 @@ class NPLEADCHAT_API {
         return ( time() - $form_started_at ) < self::MIN_SUBMIT_SECONDS;
     }
 
-    private static function npleadchat_rate_limit_key( $email ) {
-        return 'npleadchat_rate_' . md5( self::npleadchat_get_visitor_ip() . '|' . strtolower( $email ) );
+    /**
+     * Rate limit keys: one per visitor IP and one per email address, so changing
+     * the email (or the IP) alone is not enough to bypass the cooldown.
+     *
+     * @param string $email Lead email.
+     * @return string[]
+     */
+    private static function npleadchat_rate_limit_keys( $email ) {
+        return array(
+            'npleadchat_rate_ip_' . md5( self::npleadchat_get_visitor_ip() ),
+            'npleadchat_rate_em_' . md5( strtolower( $email ) ),
+        );
     }
 
     private static function npleadchat_duplicate_key( array $data ) {
@@ -165,17 +185,15 @@ class NPLEADCHAT_API {
     }
 
     public static function npleadchat_handle_lead( $request ) {
-        $params = $request->get_json_params();
-        $params = is_array( $params ) ? $params : array();
-
-        $name = isset( $params['name'] ) ? sanitize_text_field( $params['name'] ) : '';
-        $email = isset( $params['email'] ) ? sanitize_email( $params['email'] ) : '';
-        $phone = isset( $params['phone'] ) ? sanitize_text_field( $params['phone'] ) : '';
-        $message = isset( $params['message'] ) ? sanitize_textarea_field( $params['message'] ) : '';
-        $source_url = isset( $params['source_url'] ) ? esc_url_raw( $params['source_url'] ) : '';
-        $honeypot = isset( $params['website'] ) ? sanitize_text_field( $params['website'] ) : '';
-        $form_started_at = isset( $params['form_started_at'] ) ? absint( $params['form_started_at'] ) : 0;
-        $options = NPLEADCHAT_Admin::npleadchat_get_options();
+        // Types and lengths are already validated by the route schema.
+        $name            = sanitize_text_field( (string) $request->get_param( 'name' ) );
+        $email           = sanitize_email( (string) $request->get_param( 'email' ) );
+        $phone           = sanitize_text_field( (string) $request->get_param( 'phone' ) );
+        $message         = sanitize_textarea_field( (string) $request->get_param( 'message' ) );
+        $source_url      = self::npleadchat_sanitize_source_url( (string) $request->get_param( 'source_url' ) );
+        $honeypot        = sanitize_text_field( (string) $request->get_param( 'website' ) );
+        $form_started_at = absint( $request->get_param( 'form_started_at' ) );
+        $options         = NPLEADCHAT_Admin::npleadchat_get_options();
 
         if ( ! empty( $honeypot ) ) {
             return rest_ensure_response( array( 'success' => true, 'message' => self::npleadchat_success_message() ) );
@@ -198,9 +216,11 @@ class NPLEADCHAT_API {
             return rest_ensure_response( array( 'success' => false, 'message' => __( 'Please enter a valid phone number.', 'np-lead-chatbot' ) ) );
         }
 
-        $rate_limit_key = self::npleadchat_rate_limit_key( $email );
-        if ( get_transient( $rate_limit_key ) ) {
-            return rest_ensure_response( array( 'success' => false, 'message' => __( 'Please wait a moment before sending another message.', 'np-lead-chatbot' ) ) );
+        $rate_limit_keys = self::npleadchat_rate_limit_keys( $email );
+        foreach ( $rate_limit_keys as $rate_limit_key ) {
+            if ( get_transient( $rate_limit_key ) ) {
+                return rest_ensure_response( array( 'success' => false, 'message' => __( 'Please wait a moment before sending another message.', 'np-lead-chatbot' ) ) );
+            }
         }
 
         $data = array(
@@ -220,7 +240,9 @@ class NPLEADCHAT_API {
         $id = NPLEADCHAT_DB::npleadchat_insert_lead( $data );
 
         if ( $id ) {
-            set_transient( $rate_limit_key, 1, max( 10, absint( $options['rate_limit_seconds'] ) ) );
+            foreach ( $rate_limit_keys as $rate_limit_key ) {
+                set_transient( $rate_limit_key, 1, max( 10, absint( $options['rate_limit_seconds'] ) ) );
+            }
             set_transient( $duplicate_key, 1, self::DUPLICATE_WINDOW );
             self::npleadchat_send_notification( $data, $id );
 
@@ -228,24 +250,5 @@ class NPLEADCHAT_API {
         }
 
         return rest_ensure_response( array( 'success' => false, 'message' => __( 'Could not save lead', 'np-lead-chatbot' ) ) );
-    }
-
-    /**
-     * IMPROVEMENT: Admin function to clear rate limits (for debugging/testing)
-     * Only available to administrators
-     */
-    public static function npleadchat_clear_rate_limits() {
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Insufficient permissions.', 'np-lead-chatbot' ) );
-        }
-
-        global $wpdb;
-        $wpdb->query(
-            $wpdb->prepare(
-                "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
-                'npleadchat_rate_%',
-                'npleadchat_dup_%'
-            )
-        );
     }
 }

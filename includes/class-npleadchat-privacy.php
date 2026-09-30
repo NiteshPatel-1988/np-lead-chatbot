@@ -2,8 +2,7 @@
 /**
  * GDPR Privacy Integration for NP Lead Chatbot
  *
- * This file implements WordPress privacy hooks for GDPR compliance.
- * Add this to your main plugin file or include it in the initialization.
+ * Registers personal data exporter/eraser and suggested privacy policy text.
  *
  * @package NP_Lead_Chatbot
  */
@@ -20,6 +19,20 @@ class NPLEADCHAT_Privacy {
     public static function npleadchat_init_privacy() {
         add_filter( 'wp_privacy_personal_data_exporters', array( __CLASS__, 'npleadchat_register_exporter' ) );
         add_filter( 'wp_privacy_personal_data_erasers', array( __CLASS__, 'npleadchat_register_eraser' ) );
+        add_action( 'admin_init', array( __CLASS__, 'npleadchat_privacy_policy_content' ) );
+    }
+
+    /**
+     * Suggest privacy policy text under Settings > Privacy > Policy Guide.
+     */
+    public static function npleadchat_privacy_policy_content() {
+        if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
+            return;
+        }
+
+        $content = '<p>' . esc_html__( 'When you submit the chat contact form, we store the name, email address, phone number and message you enter, the page you sent it from and the date. This data is kept in this website\'s database so we can reply to you, and may be sent to the site administrator by email. It is not shared with third-party services by this plugin.', 'np-lead-chatbot' ) . '</p>';
+
+        wp_add_privacy_policy_content( __( 'Lead Capture Chat', 'np-lead-chatbot' ), wp_kses_post( $content ) );
     }
 
     /**
@@ -70,10 +83,11 @@ class NPLEADCHAT_Privacy {
         global $wpdb;
         $table = $wpdb->prefix . 'npleadchat_leads';
 
-        // Get leads associated with this email
+        // Get leads associated with this email. $table is built from $wpdb->prefix.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
         $leads = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE email = %s ORDER BY date DESC",
+                "SELECT * FROM `{$table}` WHERE email = %s ORDER BY date DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $email_address
             )
         );
@@ -148,36 +162,14 @@ class NPLEADCHAT_Privacy {
         global $wpdb;
         $table = $wpdb->prefix . 'npleadchat_leads';
 
-        // Get all leads for this email
-        $lead_ids = $wpdb->get_col(
+        // Delete every lead for this email. $table is built from $wpdb->prefix.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
+        $deleted = $wpdb->query(
             $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE email = %s",
+                "DELETE FROM `{$table}` WHERE email = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $email_address
             )
         );
-
-        if ( empty( $lead_ids ) ) {
-            return array(
-                'items_removed'  => false,
-                'items_retained' => false,
-                'messages'       => array(),
-                'done'           => true,
-            );
-        }
-
-        // Delete the leads
-        $deleted = 0;
-        foreach ( $lead_ids as $lead_id ) {
-            $result = $wpdb->query(
-                $wpdb->prepare(
-                    "DELETE FROM {$table} WHERE id = %d",
-                    $lead_id
-                )
-            );
-            if ( $result ) {
-                $deleted++;
-            }
-        }
 
         return array(
             'items_removed'  => $deleted > 0,

@@ -98,12 +98,10 @@ class NPLEADCHAT_Leads_Table extends WP_List_Table {
         $order   = isset( $_GET['order'] )   ? sanitize_text_field( wp_unslash( $_GET['order'] ) )   : 'DESC'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $search  = isset( $_REQUEST['s'] )   ? sanitize_text_field( wp_unslash( $_REQUEST['s'] ) )   : '';     // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-        $data = NPLEADCHAT_DB::npleadchat_get_leads( $orderby, $order, $search );
-
         $current_page = $this->get_pagenum();
-        $total_items  = count( $data );
+        $total_items  = NPLEADCHAT_DB::npleadchat_count_leads( $search );
 
-        $this->items = array_slice( $data, ( $current_page - 1 ) * $per_page, $per_page );
+        $this->items = NPLEADCHAT_DB::npleadchat_get_leads( $orderby, $order, $search, $per_page, $current_page );
 
         $this->set_pagination_args( array(
             'total_items' => $total_items,

@@ -128,7 +128,7 @@ class NPLEADCHAT_Admin {
             <form method="post">
                 <input type="hidden" name="page" value="npleadchat-leads" />
                 <?php
-                wp_nonce_field( 'bulk-' . $table->_args['plural'] );
+                // WP_List_Table::display() prints the bulk-leads nonce field itself.
                 $table->search_box( esc_html__( 'Search Leads', 'np-lead-chatbot' ), 'npleadchat-search' );
                 $table->display();
                 ?>
