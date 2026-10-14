@@ -4,7 +4,7 @@ Tags:              lead generation, chat widget, contact form, leads, lead track
 Requires at least: 6.0
 Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        2.4.4
+Stable tag:        2.4.5
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -225,6 +225,10 @@ WP LeadChat Pro is the premium version that unlocks unlimited leads, custom fiel
 
 == Changelog ==
 
+= 2.4.5 =
+* New: lead status (New, Contacted, Closed) with a quick dropdown on each lead and status filter links above the leads list
+* New: CSV export now includes the lead status
+
 = 2.4.4 =
 * Tested with WordPress 7.1
 * Security: lead form fields now have length limits, and the source page URL must belong to your own site
@@ -339,6 +343,9 @@ WP LeadChat Pro is the premium version that unlocks unlimited leads, custom fiel
 ---
 
 == Upgrade Notice ==
+
+= 2.4.5 =
+Adds lead status tracking (New, Contacted, Closed) with list filters, and includes the status in CSV exports. Safe to upgrade.
 
 = 2.4.4 =
 Security hardening, WordPress 7.1 compatibility and a fix for forms on cached pages. Safe to upgrade.

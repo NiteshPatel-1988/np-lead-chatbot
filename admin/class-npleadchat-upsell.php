@@ -202,7 +202,7 @@ class NPLEADCHAT_Upsell {
 							),
 							array(
 								esc_html__( 'Lead status pipeline',       'np-lead-chatbot' ),
-								'&#x274C;',
+								esc_html__( 'Basic', 'np-lead-chatbot' ),
 								'&#x2705;',
 							),
 							array(

@@ -2,7 +2,7 @@
 
 ![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
-![Version](https://img.shields.io/badge/Version-2.4.4-orange)
+![Version](https://img.shields.io/badge/Version-2.4.5-orange)
 ![License](https://img.shields.io/badge/License-GPLv2-green)
 
 A modern floating lead capture chat widget for WordPress. Collect visitor leads directly on your site and manage everything inside your WordPress dashboard - no SaaS, no monthly dependency, no data leaving your server.
@@ -226,6 +226,10 @@ Embeds the lead form inline anywhere - pages, posts, or widget areas.
 ---
 
 ## Changelog
+
+### 2.4.5
+- **New** lead status (New, Contacted, Closed) with a quick dropdown on each lead and status filter links above the leads list
+- **New** CSV export now includes the lead status
 
 ### 2.4.4
 - **Tested** with WordPress 7.1

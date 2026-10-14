@@ -11,6 +11,72 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class NPLEADCHAT_DB {
 
+    /**
+     * Allowed lead statuses (slug => label).
+     *
+     * @return array<string,string>
+     */
+    public static function npleadchat_get_statuses() {
+        return array(
+            'new'       => __( 'New', 'np-lead-chatbot' ),
+            'contacted' => __( 'Contacted', 'np-lead-chatbot' ),
+            'closed'    => __( 'Closed', 'np-lead-chatbot' ),
+        );
+    }
+
+    public static function npleadchat_is_valid_status( $status ) {
+        return is_string( $status ) && array_key_exists( $status, self::npleadchat_get_statuses() );
+    }
+
+    /**
+     * Update the status of a single lead.
+     *
+     * @param int    $id     Lead ID.
+     * @param string $status One of the whitelisted statuses.
+     * @return bool
+     */
+    public static function npleadchat_update_status( $id, $status ) {
+        global $wpdb;
+
+        $id = absint( $id );
+        if ( ! $id || ! self::npleadchat_is_valid_status( $status ) ) {
+            return false;
+        }
+
+        $updated = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table.
+            $wpdb->prefix . 'npleadchat_leads',
+            array( 'status' => $status ),
+            array( 'id' => $id ),
+            array( '%s' ),
+            array( '%d' )
+        );
+
+        return false !== $updated;
+    }
+
+    /**
+     * Lead counts keyed by status.
+     *
+     * @return array<string,int>
+     */
+    public static function npleadchat_count_by_status() {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'npleadchat_leads';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+        $rows   = $wpdb->get_results( "SELECT status, COUNT(*) AS total FROM `{$table}` GROUP BY status" );
+        $counts = array_fill_keys( array_keys( self::npleadchat_get_statuses() ), 0 );
+
+        foreach ( (array) $rows as $row ) {
+            if ( isset( $counts[ $row->status ] ) ) {
+                $counts[ $row->status ] = (int) $row->total;
+            }
+        }
+
+        return $counts;
+    }
+
     public static function npleadchat_create_table() {
         global $wpdb;
         $table           = $wpdb->prefix . 'npleadchat_leads';
@@ -23,8 +89,10 @@ class NPLEADCHAT_DB {
             phone varchar(50) NOT NULL,
             message text NOT NULL,
             source_url text NOT NULL,
+            status varchar(20) NOT NULL DEFAULT 'new',
             date datetime NOT NULL,
-            PRIMARY KEY  (id)
+            PRIMARY KEY  (id),
+            KEY status (status)
         ) {$charset_collate};";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -77,23 +145,28 @@ class NPLEADCHAT_DB {
      * @param string $search Search term.
      * @return string Prepared SQL fragment (empty when no search).
      */
-    private static function npleadchat_search_where( $search ) {
+    private static function npleadchat_search_where( $search, $status = '' ) {
         global $wpdb;
 
-        if ( '' === (string) $search ) {
-            return '';
+        $clauses = array();
+
+        if ( '' !== (string) $search ) {
+            $like      = '%' . $wpdb->esc_like( $search ) . '%';
+            $clauses[] = $wpdb->prepare(
+                '(name LIKE %s OR email LIKE %s OR phone LIKE %s OR message LIKE %s OR source_url LIKE %s)',
+                $like,
+                $like,
+                $like,
+                $like,
+                $like
+            );
         }
 
-        $like = '%' . $wpdb->esc_like( $search ) . '%';
+        if ( self::npleadchat_is_valid_status( $status ) ) {
+            $clauses[] = $wpdb->prepare( 'status = %s', $status );
+        }
 
-        return $wpdb->prepare(
-            ' WHERE name LIKE %s OR email LIKE %s OR phone LIKE %s OR message LIKE %s OR source_url LIKE %s',
-            $like,
-            $like,
-            $like,
-            $like,
-            $like
-        );
+        return empty( $clauses ) ? '' : ' WHERE ' . implode( ' AND ', $clauses );
     }
 
     /**
@@ -106,7 +179,7 @@ class NPLEADCHAT_DB {
      * @param int    $page     1-based page number.
      * @return object[]
      */
-    public static function npleadchat_get_leads( $orderby = 'date', $order = 'DESC', $search = '', $per_page = 0, $page = 1 ) {
+    public static function npleadchat_get_leads( $orderby = 'date', $order = 'DESC', $search = '', $per_page = 0, $page = 1, $status = '' ) {
         global $wpdb;
 
         $allowed_orderby = array( 'name', 'date' );
@@ -116,7 +189,7 @@ class NPLEADCHAT_DB {
         $order = ( 'ASC' === strtoupper( $order ) ) ? 'ASC' : 'DESC';
 
         $table = $wpdb->prefix . 'npleadchat_leads';
-        $where = self::npleadchat_search_where( $search );
+        $where = self::npleadchat_search_where( $search, $status );
         $limit = '';
 
         if ( $per_page > 0 ) {
@@ -134,11 +207,11 @@ class NPLEADCHAT_DB {
      * @param string $search Optional search term.
      * @return int
      */
-    public static function npleadchat_count_leads( $search = '' ) {
+    public static function npleadchat_count_leads( $search = '', $status = '' ) {
         global $wpdb;
 
         $table = $wpdb->prefix . 'npleadchat_leads';
-        $where = self::npleadchat_search_where( $search );
+        $where = self::npleadchat_search_where( $search, $status );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         return (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`{$where}" );

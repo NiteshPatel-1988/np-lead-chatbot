@@ -16,6 +16,28 @@ class NPLEADCHAT_Admin {
         add_action( 'admin_enqueue_scripts',    array( __CLASS__, 'npleadchat_enqueue' ) );
         add_action( 'admin_init',               array( __CLASS__, 'npleadchat_register_settings' ) );
         add_action( 'admin_post_npleadchat_export_leads', array( __CLASS__, 'npleadchat_export_csv' ) );
+        add_action( 'wp_ajax_npleadchat_update_status',   array( __CLASS__, 'npleadchat_ajax_update_status' ) );
+    }
+
+    public static function npleadchat_ajax_update_status() {
+        check_ajax_referer( 'npleadchat_status_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( null, 403 );
+        }
+
+        $lead_id = isset( $_POST['lead_id'] ) ? absint( wp_unslash( $_POST['lead_id'] ) ) : 0;
+        $status  = isset( $_POST['status'] ) ? sanitize_key( wp_unslash( $_POST['status'] ) ) : '';
+
+        if ( ! $lead_id || ! NPLEADCHAT_DB::npleadchat_is_valid_status( $status ) ) {
+            wp_send_json_error( null, 400 );
+        }
+
+        if ( ! NPLEADCHAT_DB::npleadchat_update_status( $lead_id, $status ) ) {
+            wp_send_json_error( null, 500 );
+        }
+
+        wp_send_json_success();
     }
 
     public static function npleadchat_enqueue( $hook ) {
@@ -29,6 +51,25 @@ class NPLEADCHAT_Admin {
             array(),
             NPLEADCHAT_VERSION
         );
+
+        if ( 'toplevel_page_npleadchat-leads' === $hook ) {
+            wp_enqueue_script(
+                'npleadchat-admin-status',
+                NPLEADCHAT_URL . 'assets/js/admin-status.js',
+                array(),
+                NPLEADCHAT_VERSION,
+                true
+            );
+            wp_localize_script(
+                'npleadchat-admin-status',
+                'npleadchatStatus',
+                array(
+                    'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                    'nonce'   => wp_create_nonce( 'npleadchat_status_nonce' ),
+                    'error'   => __( 'Could not update the status. Please try again.', 'np-lead-chatbot' ),
+                )
+            );
+        }
     }
 
     public static function npleadchat_admin_menu() {
@@ -124,6 +165,8 @@ class NPLEADCHAT_Admin {
             </form>
 
             <hr class="wp-header-end">
+
+            <?php $table->views(); ?>
 
             <form method="post">
                 <input type="hidden" name="page" value="npleadchat-leads" />
